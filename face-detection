@@ -1,0 +1,62 @@
+#include"opencv2/highgui/highgui.hpp"
+#include"opencv2/core/core.hpp"
+#include"opencv2/imgproc/imgproc.hpp"
+#include"opencv2/objdetect/objdetect.hpp"
+#include<iostream>
+
+using namespace cv;
+using namespace std;
+int main()
+{
+	VideoCapture cap(0);
+	cap.open(0);
+	if (!cap.isOpened())
+	{
+		cout << "UNABLE TO OPEN WEBCAM" << endl;
+		return -1;
+	}
+
+	Mat img,gray;
+
+	//decalring a cascade classifier and loading the cascade library;
+	CascadeClassifier detect;
+	bool success = detect.load("C:\\haarcascades\\haarcascade_frontalface_alt2.xml");
+	if (!success)
+	{
+		cout << "UNABLE TO LOAD CASCADE...PLEASE TRY AGAIN" << endl;
+		system("pause");
+		return -1;
+	}
+
+	// detection parameters
+	int groundThreshold = 2;
+	double stepScale = 2.2;
+	Size minObjectSize(80, 80);
+	Size maxObjectSize(200, 200);
+
+	vector<Rect>faces;
+	while(1)
+	{
+		cap >> img;
+		cvtColor(img, gray, CV_BGR2GRAY);
+		faces.clear();
+		detect.detectMultiScale(gray, faces, stepScale, groundThreshold, 0 | 2, minObjectSize, maxObjectSize);
+
+		if (faces.size() > 0)
+		{
+			int i;
+			for (i = 0; i < faces.size(); i++)
+			{
+				rectangle(img, faces[i].br(), faces[i].tl(), Scalar(0, 0, 100), 1, 8, 0);
+			}
+		}
+		imshow("FACE-DETECTED", img);
+		
+		if (waitKey(30) == 27)
+		{
+			cout << "Esc has been pressed by the user....so the program will shut down" << endl;
+			break;
+	}
+
+}
+}
