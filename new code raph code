@@ -1,0 +1,88 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+
+using namespace cv;
+using namespace std;
+Mat asRowMatrix(const vector<Mat>& src, int rtype, double alpha, double beta) {
+	// number of samples
+	size_t n = src.size();
+	// return empty matrix if no matrices given
+	if (n == 0)
+		return Mat();
+	// dimensionality of (reshaped) samples
+	size_t d = src[0].total();
+	// create data matrix
+	Mat data(n, d, rtype);
+	// now copy data
+	for (int i = 0; i < n; i++) {
+		// make sure data can be reshaped, throw exception if not!
+		if (src[i].total() != d) {
+			string error_message = format("Wrong number of elements in matrix #%d! Expected %d was %d.", i, d, src[i].total());
+			CV_Error(CV_StsBadArg, error_message);
+		}
+		// get a hold of the current row
+		Mat xi = data.row(i);
+		// make reshape happy by cloning for non-continuous matrices
+		if (src[i].isContinuous()) {
+			src[i].reshape(1, 1).convertTo(xi, rtype, alpha, beta);
+		}
+		else {
+			src[i].clone().reshape(1, 1).convertTo(xi, rtype, alpha, beta);
+		}
+	}
+	return data;
+}
+void detectFace(Mat &image, vector<Rect_<int>> &faces)
+{
+	string path = ".\\cascades\\haarcascade_frontalface_alt.xml";
+	CascadeClassifier cas;
+	cas.load(path);
+	cas.detectMultiScale(image, faces, 1.15, 3, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
+}
+int main()
+{
+	Mat image = imread("chelsea.jpg");
+	vector<Rect_<int>> faces;
+	vector<Mat> images;
+	vector<int> labels;
+	detectFace(image, faces);
+	for (int i = 0; i < faces.size(); i++)
+	{
+		Mat face;
+		rectangle(image, faces[i], Scalar(255, 255, 0));
+		face = image(faces[i]);
+		//imwrite(".\\Faces\\" + to_string(i) + ".jpg", face);
+		resize(face, face, Size(100, 100));
+		images.push_back(face);
+		labels.push_back(i);
+	}
+
+	int N = images.size();
+	int C = labels.size();
+
+	Mat data = asRowMatrix(images, CV_32F, 1.0, 0.0);
+	//Eigen faces
+	PCA pca(data, Mat(), PCA::DATA_AS_ROW);
+
+	Mat mean = pca.mean;
+
+	Mat proj = pca.project(data);
+	//Fisher faces
+	LDA lda(proj, labels, (C - 1));
+
+	//Combine PCA and LDA
+	Mat com;
+	lda.eigenvectors().convertTo(com, pca.eigenvectors.type());
+	Mat combine;
+	gemm(pca.eigenvectors, com, 1.0, Mat(), 0.0, combine, GEMM_1_T);
+
+	Mat features;
+	for (int i = 0; i < data.rows; i++)
+	{
+		Mat proj = LDA::subspaceProject(combine, mean, data.row(i));
+		features.push_back(proj);
+	}
+	system("pause");
+
+	return 0;
+}
